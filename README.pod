@@ -1,0 +1,351 @@
+=head1 NAME
+
+B<rgrowl> -- Send and receive Growl notifications from remote machines.
+
+=head1 SYNOPSIS
+
+rgrowl [-hsw] [--amazon-access-key key] [--amazon-region region]
+[--amazon-secret-key key] [-a appname] [-d identifier] [-H host] [-i extension]
+[-I filepath] [--image filepath] [-m message] [-n name] [-P password]
+[-p priority] [--sqs-queue queuename] [-t] [title]
+
+rgrowl --daemon [--amazon-access-key key] [--amazon-region region]
+[--amazon-secret-key key] [--poll-interval interval] [--sqs-queue queuename]
+
+rgrowl --man
+
+Options:
+  
+  --amazon-access-key Your AWS Access Key ID.
+  --amazon-region     The AWS region in which to store the notifications.
+  --amazon-secret-key Your AWS Secret Key.
+  --appIcon,-a        The application to use for the icon.
+  --daemon            Run in receiving rather than sending mode.
+  --help,-h           Display a short help message.
+  --host,-H           The hostname or IP for a remote Growl notification.
+  --icon,-i           The filetype or extension to take the icon from.
+  --iconpath,-I       A file whose icon should be the notification icon.
+  --identifier,-d     An identifier to help coalesce notifications.
+  --image             An image to use as the icon for the notification.
+  --man               Display a man page for rgrowl.
+  --message,-m        The text of the notification.
+  --name,-n           The name of the app sending the notification.
+  --password,-P       The password to authenticate a remote notification.
+  --poll-interval     The time to sleep between polling in daemon mode.
+  --priority,-p       Set the urgency of the notification.
+  --sqs-queue         The name of the SQS queue used for storage.
+  --sticky,-s         Require the notification to be dismissed manually.
+  --title,-t          Here for compatibility with growlnotify.
+  --wait,-w           Ignored. Here for compatibility with growlnotify.
+
+=head1 DESCRIPTION
+
+L<Growl|http://growl.info/> natively has the ability to receive and display
+notifications but it requires Growl to be reachable by the remote sender. On
+many networks your machine may be behind a firewall or NAT which makes it
+difficult to reach.
+
+B<rgrowl> uses L<Amazon SQS|http://aws.amazon.com/sqs/> as a "mailbox" for Growl
+notifications. Any app wishing to send a growl notification simply runs
+B<rgrowl> with the same arguments as Growl's L<growlnotify> command line
+program.  On the receiving machine, B<rgrowl> runs as a daemon and polls the
+SQS mailbox for notifications and displays them as appropriate. As soon as the
+message is received, it is deleted from the mailbox.
+
+To set B<rgrowl> up, see the instructions in L</INSTALLATION> below.
+
+The following options are available:
+
+=over 21
+
+=item B<--amazon-access-key>
+
+The Access Key ID for your Amazon Web Services account.
+
+=item B<--amazon-region>
+
+The region where you wish to keep your SQS queue. By default, it's kept in
+us-east-1 but you may wish to change this to a region closer to you.
+
+=item B<--amazon-secret-key>
+
+The Secret Key matching your Access Key ID above.
+
+=item B<--appIcon>, B<-a>
+
+Either the name of an application or the full path to the .app directory for
+that application. The icon for this application will be used as the icon for
+the notification I<or> as part of the icon for the notification depending on
+the values of B<--icon>, B<--iconpath>, B<--image> and the Growl display style
+used.
+
+=item B<--daemon>
+
+Run B<rgrowl> in the background collecting and triggering Growl notifications.
+You should never need to specify this manually, if you've installed B<rgrowl>
+according to the instructions below it should be set up automatically for you.
+
+=item B<--help>, B<-h>
+
+Display a short summary of the available command line options.
+
+=item B<--host>, B<-H>
+
+The host to send the Growl notification to. Note, this is not required unless
+you've installed the B<rgrowl> daemon in order to relay the notifications to
+another machine.
+
+=item B<--icon>, B<-i>
+
+Provide a file extension and the icon for the notification will be the icon for
+that file type.
+
+=item B<--iconpath>, B<-I>
+
+Provide a path to a file and the appropriate icon for that file will be used as
+the icon for the notification.
+
+=item B<--identifier>, B<-d>
+
+If several notifications are sent with the same identifier the notifications
+will be coalesced into one on display. Only some displays support coalescing.
+
+=item B<--image>
+
+Use this to specify the image to be used as the icon for the notification.
+
+=item B<--man>
+
+Display a man page for B<rgrowl>.
+
+=item B<--message>, B<-m>
+
+The message portion of the notification.
+
+=item B<--name>, B<-n>
+
+Set the name of the application which is sending the notification.
+
+=item B<--password>, B<-P>
+
+Provide a password for notifications sent to remote hosts. Ignored unless
+B<--host> is used.
+
+=item B<--poll-interval>
+
+Set the amount of time (in seconds) to sleep between polling for new messages.
+The lower you make this, the more "instant" the notifications you feel. On the
+other hand, it will cost you more money in AWS fees.
+
+=item B<--priority>, B<-p>
+
+Set the priority of the notification. Valid values are:
+
+=over
+
+=item Very Low
+
+=item Moderate
+
+=item Normal
+
+=item High
+
+=item Emergency
+
+=item -2
+
+=item -1
+
+=item 0
+
+=item 1
+
+=item 2
+
+=back
+
+Not all display methods respect priority.
+
+=item B<--sqs-queue>
+
+The name of the SQS queue in which to store the notifications while they're in
+transit.
+
+=item B<--sticky>, B<-s>
+
+Make the notification sticky, i.e. require user interaction to dismiss the
+notification.
+
+=item B<--title>, B<-t>
+
+Set the title of the notification. If this is not provided, the remaining
+non-option command line arguments are used as the title. If both this option
+and extra items are used, the extra arguments are concatenated onto this
+argument.
+
+=item B<--wait>, B<-w>
+
+Wait until the notification has been dismissed before returning. Due to the way
+B<rgrowl> is constructed this is not possible so this argument is ignored.
+
+=back
+
+=head1 INSTALLATION
+
+Before installing rgrowl, you should sign up for Amazon Web Services. Then log
+into the AWS Console and create an SQS queue called "GrowlNotifications". 
+
+=head2 On all machines using rgrowl
+
+=over
+
+=item 1. Install rgrowl's dependencies
+
+In addition to L<Getopt::Long> and L<Pod::Usage>, rgrowl also requires
+L<Amazon::SQS::Simple> and L<JSON>. If your chosen operating system does not
+already have a package for these modules you can install them using CPAN with
+the following two commands:
+
+=over 2
+
+=item $
+
+sudo perl -MCPAN install Amazon::SQS::Simple
+
+=item $
+
+sudo perl -MCPAN install JSON
+
+=back
+
+=item 2. Install rgrowl
+
+Copy rgrowl to a directory in your path and make it executable. For example, to
+install it system-wide run the following:
+
+=over 2
+
+=item $
+
+sudo cp rgrowl /usr/bin/rgrowl
+
+=item $
+
+sudo chmod 555 /usr/bin/rgrowl
+
+=back
+
+=item 3. Configure rgrowl
+
+Create a configuration file with the following contents:
+
+    amazon-access-key = 'AAAAAAAAAAAAAAAAAAAA'
+    amazon-secret-key = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+    amazon-region = 'us-east-1'
+
+Replace the values with the appropriate ones found in your Amazon Web Services
+Console. Any command line option is allowed (minus the -- prefix) but the above
+is the recommended minimum.
+
+Install the configuration file in any one of the following locations (this is
+the order in which configuration files are searched for, later files override
+earlier ones).
+
+=over
+
+=item /opt/local/etc/rgrowlrc
+
+=item /usr/local/etc/rgrowlrc
+
+=item /etc/rgrowlrc
+
+=item $HOME/.rgrowlrc
+
+=back
+
+=back
+
+=head2 On the machine displaying Growl notifications
+
+On the machine where you want your Growl notifications to display, you need to
+do the following additional steps.
+
+=over
+
+=item 1. Install Growl
+
+If you haven't done it already, install Growl.
+
+=item 2. Install growlnotify
+
+If you are running a version of Growl earlier than version 1.3, growlnotify is
+available inside the DMG file you downloaded. For Growl 1.3 and later you need
+to download it separately from L<http://growl.info/extras.php#growlnotify>.
+
+=item 3. Arrange for rgrowl to be run in daemon mode.
+
+Run the following commands in a terminal:
+
+  $ launchctl submit -l com.mcdermottroe.rgrowl -- \
+        /usr/bin/perl -T /usr/bin/rgrowl --daemon
+  $ launchctl start com.mcdermottroe.rgrowl
+
+=back
+
+=head1 DIAGNOSTICS
+
+The B<rgrowl> utility exits 0 on success, and >0 if an error occurs.
+
+=head1 ENVIRONMENT
+
+The following environment variables affect the execution of B<rgrowl>:
+
+=over 6
+
+=item PATH
+
+The PATH is used to search for L<growlnotify(1)> and L<osascript(1)>. The
+former is required and the latter is desirable when running in daemon mode. 
+
+=back
+
+=head1 LICENSE
+
+Copyright (c) 2012, Conor McDermottroe
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+=over 2
+
+=item -
+
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+=item -
+
+Redistributions in binary form must reproduce the above copyright notice, this
+list of conditions and the following disclaimer in the documentation and/or
+other materials provided with the distribution.
+
+=back
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+=cut
+
+=head1 SEE ALSO
+
+L<growlnotify(1)>
